@@ -3,28 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
-    <title>Turf.js tutorial - Kentucky hospitals</title>
-
+    <title>Turf.js spatial analysis - nearest Calgary hospitals</title>
+    <!-- Bootstrap (before stylesheets) -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+          integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <!-- MapBoxGL -->
     <script src='https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.js'></script>
+    <!-- MapBoxGL stylesheet-->
     <link href='https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.css' rel='stylesheet' />
-        <script src='https://api.mapbox.com/mapbox.js/plugins/turf/v3.0.11/turf.min.js'></script>
+    <script src='https://api.mapbox.com/mapbox.js/plugins/turf/v3.0.11/turf.min.js'></script>
     <script src='https://npmcdn.com/@turf/turf/turf.min.js'></script>
     <style>
         body {
             margin: 0;
             padding: 0;
         }
+        p {
+            text-size: 20;
+            text-align: center;
+        }
         #map {
             position: absolute;
             top: 0;
             bottom: 0;
             width: 100%;
+            z-index: 10;
+        }
+        #header {
+            /*text-align: right;*/
+            /*text-align: bottom;*/
+            padding-top: 3%;
+            padding-left: 43%;
+            z-index: 100;
         }
     </style>
 </head>
 <body>
-<!--Create a mapBox map-->
-<div id='map'></div>
+<div class="row">
+    <!--Create a mapBox map-->
+    <div id="map" class="col-12"></div>
+    <div id="header"><h2>Nearest hospital & clinic finder by Calgary schools</h2>
+    <p>Click on your school to find the nearest hospital or clinic!</p></div>
+</div>
 
 <script>
     // Access token for MapBox
@@ -35,11 +55,12 @@
         container: 'map', // container id
         style: 'mapbox://styles/mapbox/light-v10', // stylesheet location
         center: [-114.06667, 51.04999], // starting position
-        zoom: 11 // starting zoom
+        // pitch: 85, // pitch in degrees
+        zoom: 10 // starting zoom
     });
 
-    // Create hospitals and libraries layers - GeoJSON FeatureCollections
-    // Load layers onto map
+    // Create hospitals and libraries layers - GeoJSON FeatureCollections -
+    // and load layers onto map
     map.on('load', function() {
         map.addLayer({
             id: 'hospitals',
@@ -50,22 +71,77 @@
             },
             layout: {
                 'icon-image': 'hospital-15',
-                'icon-allow-overlap': true
+                'icon-allow-overlap': true,
+                "text-field": "{type}",
+                "text-offset": [0, 0.7],
+                "text-anchor": "top",
+                'icon-size': 1.5
             },
-            paint: { }
+            paint: {
+                "text-color": "#9d0d07",
+
+            }
         });
         map.addLayer({
             id: 'schools',
             type: 'symbol',
             source: {
                 type: 'geojson',
-                data: "https://data.calgary.ca/resource/fd9t-tdn2.geojson"
+                data: "https://data.calgary.ca/resource/fd9t-tdn2.geojson",
+                cluster: true,
+                clusterMaxZoom: 11, // Max zoom to cluster points on
+                clusterRadius: 25
             },
             layout: {
-                'icon-image': 'school-15'
+                'icon-image': 'school-15',
+                'icon-allow-overlap': true,
+                'icon-size': 1.5
             },
             paint: { }
         });
+
+        map.addLayer({
+            id: 'clusters',
+            type: 'circle',
+            source: 'schools',
+            filter: ['has', 'point_count'],
+            paint: {
+// Three steps to implement three types of circles:
+//   * Blue, 20px circles when point count is less than 3
+//   * Green, 30px circles when point count is between 3 and 6
+//   * Yellow, 40px circles when point count is greater than or equal to 6
+                'circle-color': [
+                    'step',
+                    ['get', 'point_count'],
+                    '#51bbd6',
+                    3,
+                    '#ADFF2F',
+                    6,
+                    '#f1f075'
+                ],
+                'circle-radius': [
+                    'step',
+                    ['get', 'point_count'],
+                    20,
+                    3,
+                    25,
+                    6,
+                    30
+                ]
+            }
+        });
+        map.addLayer({
+            id: 'cluster-count',
+            type: 'symbol',
+            source: 'schools',
+            filter: ['has', 'point_count'],
+            layout: {
+                'text-field': '{point_count_abbreviated}',
+                'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                'text-size': 12
+            }
+        });
+
 
         // Add source
         map.addSource('nearest-hospital', {
@@ -83,51 +159,95 @@
 
     // Create a HOVER event handler
     map.on('mousemove', function(e) {
-        var features = map.queryRenderedFeatures(e.point, { layers: ['hospitals', 'schools'] });
+        var features = map.queryRenderedFeatures(e.point, { layers: ['hospitals', 'schools', 'clusters', 'cluster-count'] });
         if (!features.length) {
             popup.remove();
             return;
         }
         var feature = features[0];
+        if (!feature.properties.name) {
+            popup.remove();
+            return;
+        }
         popup.setLngLat(feature.geometry.coordinates)
             .setHTML(feature.properties.name)
             .addTo(map);
         map.getCanvas().style.cursor = features.length ? 'pointer' : '';
     });
 
-    // // Create a CLICK event handler - uses Turf.js library
-    // map.on('click', function(e) {
-    //     // Return any features from the 'schools' layer whenever the map is clicked
-    //     var schoolFeatures = map.queryRenderedFeatures(e.point, { layers: ['hospitals', 'schools'] });
-    //     if (!schoolFeatures.length) {
-    //         return;
-    //     }
-    //     var schoolFeatures = schoolFeatures[0];
-    //     // Using Turf.js, find the nearest hospital to library clicked
-    //     var nearestHospital = turf.nearest(schoolFeatures, hospitals);
-    //
-    //     // If a nearest library is found
-    //     if (nearestHospital !== null) {
-    //         // Update the 'nearest-library' data source to include
-    //         // the nearest library
-    //         map.getSource('nearest-hospital').setData({
-    //             type: 'FeatureCollection',
-    //             features: [
-    //                 nearestHospital
-    //             ]
-    //         });
-    //         // Create a new circle layer from the 'nearest-library' data source
-    //         map.addLayer({
-    //             id: 'nearest-hospital',
-    //             type: 'circle',
-    //             source: 'nearest-hospital',
-    //             paint: {
-    //                 'circle-radius': 12,
-    //                 'circle-color': '#d473e0'
-    //             }
-    //         }, 'hospitals');
-    //     }
-    // });
+    // define global hospital features object
+    var global = this;
+    var HospitalFeatureCollection = {
+        type: 'FeatureCollection',
+        features: new Array(0)
+    };
+    // once everything is loaded, populate global.HospitalFeatureCollection from Hospitals/Clinics layer
+    map.once('idle', () => {
+        console.log('map is idle');
+        // get hospital features
+        var HospitalFeatures = map.querySourceFeatures('hospitals');
+        console.log(HospitalFeatures);
+        //convert HospitalFeatures from an array of features to a feature collection object
+        global.HospitalFeatureCollection = {
+            type: 'FeatureCollection',
+            features: HospitalFeatures
+        };
+        console.log(global.HospitalFeatureCollection);
+    });
+
+    // Create CLICK event handlers
+    // 1. Inspect a cluster on click
+    map.on('click', 'clusters', function(e) {
+        var features = map.queryRenderedFeatures(e.point, {
+            layers: ['clusters']
+        });
+        var clusterId = features[0].properties.cluster_id;
+        map.getSource('schools').getClusterExpansionZoom(
+            clusterId,
+            function(err, zoom) {
+                if (err) return;
+
+                map.easeTo({
+                    center: features[0].geometry.coordinates,
+                    zoom: zoom
+                });
+            }
+        );
+    });
+
+    // 2. Find nearest hospital/clinic using Turf.js library
+    map.on('click', function(e) {
+        // Return any features from the 'schools' layer whenever the map is clicked
+        var schoolFeatures = map.queryRenderedFeatures(e.point, { layers: ['hospitals', 'schools'] });
+        if (!schoolFeatures.length) {
+            return;
+        }
+        var schoolFeatures = schoolFeatures[0];
+        // Using Turf.js, find the nearest hospital to school clicked
+        var nearestHospital = turf.nearest(schoolFeatures, global.HospitalFeatureCollection);
+
+        // If a nearest library is found
+        if (nearestHospital !== null) {
+            // Update the 'nearest-hospital' data source to include
+            // the nearest hospital
+            map.getSource('nearest-hospital').setData({
+                type: 'FeatureCollection',
+                features: [
+                    nearestHospital
+                ]
+            });
+            // Create a new circle layer from the 'nearest-school' data source
+            map.addLayer({
+                id: 'nearest-hospital',
+                type: 'circle',
+                source: 'nearest-hospital',
+                paint: {
+                    'circle-radius': 30,
+                    'circle-color': "#FFB6C1"
+                }
+            }, 'hospitals');
+        }
+    });
 
 </script>
 </body>
