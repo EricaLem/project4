@@ -55,33 +55,14 @@
         container: 'map', // container id
         style: 'mapbox://styles/mapbox/light-v10', // stylesheet location
         center: [-114.06667, 51.04999], // starting position
-        // pitch: 85, // pitch in degrees
+        pitch: 35, // pitch in degrees
         zoom: 10 // starting zoom
     });
 
     // Create hospitals and libraries layers - GeoJSON FeatureCollections -
     // and load layers onto map
     map.on('load', function() {
-        map.addLayer({
-            id: 'hospitals',
-            type: 'symbol',
-            source: {
-                type: 'geojson',
-                data: "https://data.calgary.ca/resource/x34e-bcjz.geojson?$where=type=='Hospital' OR type=='PHS Clinic'"
-            },
-            layout: {
-                'icon-image': 'hospital-15',
-                'icon-allow-overlap': true,
-                "text-field": "{type}",
-                "text-offset": [0, 0.7],
-                "text-anchor": "top",
-                'icon-size': 1.5
-            },
-            paint: {
-                "text-color": "#9d0d07",
 
-            }
-        });
         map.addLayer({
             id: 'schools',
             type: 'symbol',
@@ -141,8 +122,24 @@
                 'text-size': 12
             }
         });
-
-
+        map.addLayer({
+            id: 'hospitals',
+            type: 'symbol',
+            source: {
+                type: 'geojson',
+                data: "https://data.calgary.ca/resource/x34e-bcjz.geojson?$where=type=='Hospital' OR type=='PHS Clinic'"
+            },
+            layout: {
+                'icon-image': 'hospital-15',
+                "text-field": "{type}",
+                "text-offset": [0, 0.7],
+                "text-anchor": "top",
+                'icon-size': 1.8
+            },
+            paint: {
+                "text-color": "#9d0d07"
+            }
+        });
         // Add source
         map.addSource('nearest-hospital', {
             type: 'geojson',
@@ -206,7 +203,6 @@
             clusterId,
             function(err, zoom) {
                 if (err) return;
-
                 map.easeTo({
                     center: features[0].geometry.coordinates,
                     zoom: zoom
