@@ -1,5 +1,5 @@
 # project4
-Using Turf.js to add spatial analysis to a map
+Using Turf.js to add spatial and statistical analysis to a map.
 
 # Objective
 Become familiar with adding spatial and statistical analysis to a map with 
